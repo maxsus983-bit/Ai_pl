@@ -41,8 +41,8 @@ class AIAgent {
 
     this.bot.loadPlugin(pathfinder);
     this.bot.loadPlugin(pvp);
-    this.bot.loadPlugin(autoeat);
-
+    this.bot.loadPlugin(autoEat);
+    
     this.perception = new Perception(this.bot);
     this.builder = new Builder(this.bot);
     this.combat = new CombatEngine(this.bot);
