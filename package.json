@@ -1,0 +1,20 @@
+{
+  "name": "minecraft-ai-civilization",
+  "version": "1.0.0",
+  "description": "Autonomous Multi-Agent AI Civilization Framework for Minecraft Paper 1.12.2",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "mineflayer": "^4.20.1",
+    "mineflayer-auto-eat": "^3.3.0",
+    "mineflayer-pathfinder": "^2.4.5",
+    "mineflayer-pvp": "^1.3.2",
+    "minecraft-data": "^3.45.0",
+    "node-fetch": "^2.7.0",
+    "sqlite3": "^5.1.7",
+    "vec3": "^0.1.8"
+  }
+}
