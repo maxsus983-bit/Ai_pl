@@ -1,8 +1,9 @@
-const fetch = require('node-fetch');
+const fetch = require('node-fetch'); // const qo'shildi
 const config = require('../../config/config');
 
 async function queryOpenRouter(systemPrompt, userPrompt) {
-  if (!config.openrouter.apiKey) {
+  if (!config.openrouter?.apiKey) {
+    console.error('[LLM Error] API kalit topilmadi!');
     return null;
   }
 
@@ -27,14 +28,18 @@ async function queryOpenRouter(systemPrompt, userPrompt) {
     });
 
     if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[LLM Error] API javob bermadi: ${response.status} - ${errText}`);
       return null;
     }
 
     const data = await response.json();
     return data.choices?.[0]?.message?.content?.trim() || null;
   } catch (err) {
+    console.error('[LLM Catch Error]:', err.message);
     return null;
   }
 }
 
 module.exports = { queryOpenRouter };
+        
