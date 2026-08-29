@@ -1,7 +1,10 @@
 const mineflayer = require('mineflayer');
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
 const { plugin: pvp } = require('mineflayer-pvp');
-const autoEat = require('mineflayer-auto-eat').plugin;
+
+const autoEatPlugin = require('mineflayer-auto-eat');
+const autoEat = autoEatPlugin.plugin ? autoEatPlugin.plugin : autoEatPlugin;
+
 const config = require('../../config/config');
 const db = require('../database/db');
 const Personality = require('./personality');
@@ -21,6 +24,7 @@ class AIAgent {
     this.isBusy = false;
     this.reconnectAttempts = 0;
     this.targetPlayerToFollow = null;
+    this.isSpawned = false;
   }
 
   async init() {
@@ -50,7 +54,9 @@ class AIAgent {
         host: config.server.host,
         port: config.server.port,
         username: this.name,
-        version: config.server.version
+        version: config.server.version,
+        checkTimeoutInterval: 120000, // Aternos kick qilmasligi uchun vaqtni 2 daqiqaga uzaytiramiz
+        hideErrors: false
       });
     } catch (botErr) {
       console.error(`[CRITICAL] Botni yaratishda xatolik:`, botErr.message);
@@ -73,8 +79,9 @@ class AIAgent {
     const bot = this.bot;
 
     bot.once('spawn', () => {
-      console.log(`[AGENT SPAWNED] 🚀 ${this.name} serverga kirdi va hayotni boshladi!`);
+      console.log(`[AGENT SPAWNED] 🚀 ${this.name} serverga muvaffaqiyatli kirdi!`);
       this.reconnectAttempts = 0;
+      this.isSpawned = true;
 
       const mcData = require('minecraft-data')(bot.version);
       bot.pathfinder.setMovements(new Movements(bot, mcData));
@@ -83,16 +90,19 @@ class AIAgent {
         bot.autoEat.enable();
       }
 
-      // Doimiy harakat va qaror qabul qilish sikli (har 4 soniyada tekshiradi)
-      setInterval(() => this.decisionCycle(), 4000);
+      // Harakat va qarorlar sikli (serverni qiynamaslik uchun vaqtni 7 soniyaga uzaytirdik)
+      if (!this.decisionInterval) {
+        this.decisionInterval = setInterval(() => this.decisionCycle(), 7000);
+      }
 
-      // O'ZI AVTOMATIK CHATGA YOZISH (Har 45 soniyada o'zi fikr bildiradi)
-      setInterval(() => {
-        this.sendAutonomousChat();
-      }, 45000);
+      // Chatga o'zi gapirish (har 60 soniyada)
+      if (!this.chatInterval) {
+        this.chatInterval = setInterval(() => {
+          this.sendAutonomousChat();
+        }, 60000);
+      }
     });
 
-    // O'yinchilarning chat xabarlari va buyruqlari
     bot.on('chat', async (username, message) => {
       if (username === this.name) return;
       const msgLower = message.toLowerCase();
@@ -101,7 +111,7 @@ class AIAgent {
         await FactionManager.processSocialInteraction(this.name, username, message);
       } catch (e) {}
 
-      // 1. ERGASHISH BUYRUG'I
+      // 1. Ergashish buyrug'i
       if (msgLower.includes('ergash') || msgLower.includes('follow')) {
         const player = bot.players[username]?.entity;
         if (player) {
@@ -111,7 +121,7 @@ class AIAgent {
         }
       }
 
-      // 2. TO'XTASH BUYRUG'I
+      // 2. To'xtash buyrug'i
       if (msgLower.includes('toxta') || msgLower.includes('stop') || msgLower.includes("to'xta")) {
         this.targetPlayerToFollow = null;
         bot.pathfinder.setGoal(null);
@@ -119,7 +129,7 @@ class AIAgent {
         return;
       }
 
-      // 3. BUYUM SO'RASH
+      // 3. Buyum so'rash
       if (msgLower.includes('ber') || msgLower.includes('give')) {
         if (this.personality.friendliness > 50 || Math.random() > 0.4) {
           bot.chat(`Mayli, buni senga beraman.`);
@@ -133,8 +143,8 @@ class AIAgent {
         return;
       }
 
-      // 4. AI ORQALI O'YINCHI BILAN SUHBAT
-      if (message.includes(this.name) || Math.random() < 0.3) {
+      // 4. AI orqali suhbat
+      if (message.includes(this.name) || Math.random() < 0.25) {
         try {
           const systemPrompt = `You are ${this.name}, an autonomous AI citizen in Minecraft.
 Personality - Courage: ${this.personality.courage}, Friendliness: ${this.personality.friendliness}, Aggression: ${this.personality.aggression}.
@@ -153,6 +163,7 @@ Reply in Uzbek language in 1 short, natural sentence.`;
 
     bot.on('end', (reason) => {
       console.log(`[DISCONNECTED] Uzildi: ${reason}. Qayta ulanmoqda...`);
+      this.cleanup();
       this.retryConnection();
     });
 
@@ -161,8 +172,21 @@ Reply in Uzbek language in 1 short, natural sentence.`;
     });
   }
 
+  cleanup() {
+    this.isSpawned = false;
+    this.targetPlayerToFollow = null;
+    if (this.decisionInterval) {
+      clearInterval(this.decisionInterval);
+      this.decisionInterval = null;
+    }
+    if (this.chatInterval) {
+      clearInterval(this.chatInterval);
+      this.chatInterval = null;
+    }
+  }
+
   async sendAutonomousChat() {
-    if (!this.bot || !this.bot.entity) return;
+    if (!this.isSpawned || !this.bot || !this.bot.entity) return;
     try {
       const systemPrompt = `You are ${this.name}, an autonomous AI living in Minecraft. 
 Write a short, casual thought or message in Uzbek language to say out loud in chat (max 1 sentence).`;
@@ -176,19 +200,20 @@ Write a short, casual thought or message in Uzbek language to say out loud in ch
 
   retryConnection() {
     this.reconnectAttempts++;
-    const delay = Math.min(this.reconnectAttempts * 5000, 30000);
+    const delay = Math.min(this.reconnectAttempts * 10000, 60000); // Har safar vaqtni asta-sekin uzaytiramiz
+    console.log(`[RECONNECT] ${delay / 1000} soniyadan keyin qayta ulaniladi...`);
     setTimeout(() => this.connectBot(), delay);
   }
 
   async decisionCycle() {
-    if (!this.bot || !this.bot.entity) return;
+    if (!this.isSpawned || !this.bot || !this.bot.entity) return;
     if (this.isBusy) return;
     this.isBusy = true;
 
     try {
       const bot = this.bot;
 
-      // 1. Agar kimgadir ergashish kerak bo'lsa
+      // 1. Ergashish
       if (this.targetPlayerToFollow) {
         const targetPlayer = bot.players[this.targetPlayerToFollow]?.entity;
         if (targetPlayer) {
@@ -200,7 +225,7 @@ Write a short, casual thought or message in Uzbek language to say out loud in ch
         }
       }
 
-      // 2. Dushman yaqinlashsa jang qilish
+      // 2. Dushmanlardan qochish / jang
       const enemy = bot.nearestEntity(entity => {
         return (entity.type === 'mob' && entity.username !== this.name) || 
                (entity.type === 'player' && entity.username !== this.name && this.personality.aggression > 70);
@@ -214,9 +239,9 @@ Write a short, casual thought or message in Uzbek language to say out loud in ch
         }
       }
 
-      // 3. ERKIN KEZIB YURISH (Serverni qotirmasdan va kick qilmasdan)
+      // 3. Erkin harakat (Faqat to'xtab turganda yangi yo'l oladi)
       if (!bot.pathfinder.isMoving()) {
-        const range = 12;
+        const range = 10;
         const pos = bot.entity.position;
         const tx = Math.floor(pos.x + (Math.random() * (range * 2) - range));
         const tz = Math.floor(pos.z + (Math.random() * (range * 2) - range));
@@ -228,9 +253,10 @@ Write a short, casual thought or message in Uzbek language to say out loud in ch
     } finally {
       setTimeout(() => {
         this.isBusy = false;
-      }, 5000);
+      }, 4000);
     }
   }
 }
 
 module.exports = AIAgent;
+            
