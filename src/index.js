@@ -1,8 +1,16 @@
-const AIAgent = './ai/agent'; // Loyihangiz tuzilishiga qarab yo'lni to'g'rilang
-const AIAgentClass = require('./ai/agent');
+require('dotenv').config(); // Agar .env fayldan ma'lumot o'qish kerak bo'lsa
+const AIAgent = require('./ai/agent');
 
-// Faqat bitta universal bot yaratamiz (u hamma ishni o'zi bajaradi)
-const botAgent = new AIAgentClass('ROZA', 'Universal');
-botAgent.init();
+console.log('[SYSTEM] Minecraft AI Agent ishga tushirilmoqda...');
 
-console.log('[SYSTEM] Universal AI Bot ishga tushdi va serverga ulanmoqda...');
+try {
+    // Bitta universal bot yaratamiz (Mining, Building, PvP va Chatni o'zi bajaradi)
+    const botAgent = new AIAgent('ROZA', 'Universal');
+    
+    // Agentni ishga tushirish
+    botAgent.init();
+    
+    console.log('[SYSTEM] ROZA agenti muvaffaqiyatli ishga tushdi va serverga ulanishga urunmoqda.');
+} catch (error) {
+    console.error('[CRITICAL ERROR] Botni ishga tushirishda xatolik yuz berdi:', error);
+}
