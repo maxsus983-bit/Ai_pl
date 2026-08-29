@@ -15,12 +15,12 @@ class AIAgent {
   constructor(name, role = 'Universal') {
     this.name = name;
     this.role = role;
-    this.faction = 'Neutral'; // Do'st, Dushman yoki Neutral
+    this.faction = 'Neutral';
     this.bot = null;
     this.personality = new Personality();
     this.isBusy = false;
     this.reconnectAttempts = 0;
-    this.targetPlayerToFollow = null; // Kimga ergashish kerakligi
+    this.targetPlayerToFollow = null;
   }
 
   async init() {
@@ -80,14 +80,12 @@ class AIAgent {
       bot.pathfinder.setMovements(new Movements(bot, mcData));
       
       if (bot.autoEat) {
-        bot.autoEat.enable(); // Och qolganda avtomatik ovqat yeydi
+        bot.autoEat.enable();
       }
 
-      // Doimiy aql va harakat sikli (har 4 soniyada bir ishlaydi)
       setInterval(() => this.decisionCycle(), 4000);
     });
 
-    // Kimdir gapirganda yoki buyruq berganda
     bot.on('chat', async (username, message) => {
       if (username === this.name) return;
       const msgLower = message.toLowerCase();
@@ -96,8 +94,8 @@ class AIAgent {
         await FactionManager.processSocialInteraction(this.name, username, message);
       } catch (e) {}
 
-      // 1. ERGASHISH BUYRUG'I ("menga ergash", "follow me")
-      if (msgLower.includes('ergash') || msgLower.includes('follow')iliyuv) {
+      // 1. ERGASHISH BUYRUG'I
+      if (msgLower.includes('ergash') || msgLower.includes('follow')) {
         const player = bot.players[username]?.entity;
         if (player) {
           this.targetPlayerToFollow = username;
@@ -106,7 +104,7 @@ class AIAgent {
         }
       }
 
-      // 2. TO'XTASH BUYRUG'I ("to'xta", "stop")
+      // 2. TO'XTASH BUYRUG'I
       if (msgLower.includes('toxta') || msgLower.includes('stop') || msgLower.includes("to'xta")) {
         this.targetPlayerToFollow = null;
         bot.pathfinder.setGoal(null);
@@ -114,12 +112,10 @@ class AIAgent {
         return;
       }
 
-      // 3. BUYUM SO'RASH ("menga ... ber", "give me")
+      // 3. BUYUM SO'RASH
       if (msgLower.includes('ber') || msgLower.includes('give')) {
-        // Xarakterining do'stligiga qarab buyum berish yoki rad etish
         if (this.personality.friendliness > 50 || Math.random() > 0.4) {
           bot.chat(`Mayli, buni senga beraman.`);
-          // Qo'lidagi biror narsani o'yinga tashlab berish
           const item = bot.inventory.items()[0];
           if (item) {
             bot.toss(item.type, null, 1, () => {});
@@ -130,7 +126,7 @@ class AIAgent {
         return;
       }
 
-      // 4. ODDIY AI SUHBAT VA MUNOSABAT (Do'st yoki Dushman bo'lishi)
+      // 4. ODDIY AI SUHBAT
       if (message.includes(this.name) || Math.random() < 0.2) {
         try {
           const memories = await db.getMemories(this.name, 3).catch(() => []);
@@ -139,15 +135,13 @@ class AIAgent {
           const systemPrompt = `You are ${this.name}, an autonomous, living AI citizen in Minecraft.
 Personality - Courage: ${this.personality.courage}, Friendliness: ${this.personality.friendliness}, Aggression: ${this.personality.aggression}.
 Role: ${this.role}.
-You can choose to be friendly, hostile, or neutral towards players depending on your personality.
 Reply in Uzbek language in 1 short, natural sentence.`;
 
-          const userPrompt = `${username} said: "${message}". Respond with your own free will.`;
+          const userPrompt = `${username} said: "${message}". Respond naturally.`;
           const reply = await queryOpenRouter(systemPrompt, userPrompt);
 
           if (reply) {
             bot.chat(reply);
-            // Agar tajovuzkorligi juda baland bo'lsa, dushmanlik qilishi mumkin
             if (this.personality.aggression > 80 && Math.random() < 0.3) {
               const player = bot.players[username]?.entity;
               if (player && this.combat) {
@@ -176,7 +170,6 @@ Reply in Uzbek language in 1 short, natural sentence.`;
     setTimeout(() => this.connectBot(), delay);
   }
 
-  // MUSTAQIL HARAKAT VA OMON QOLISH SIKLI
   async decisionCycle() {
     if (this.isBusy || !this.bot || !this.bot.entity) return;
     this.isBusy = true;
@@ -184,7 +177,6 @@ Reply in Uzbek language in 1 short, natural sentence.`;
     try {
       const bot = this.bot;
 
-      // 1. Agar kimgadir ergashish buyurilgan bo'lsa, o'sha o'yinchini topib ketadi
       if (this.targetPlayerToFollow) {
         const targetPlayer = bot.players[this.targetPlayerToFollow]?.entity;
         if (targetPlayer) {
@@ -194,14 +186,12 @@ Reply in Uzbek language in 1 short, natural sentence.`;
         }
       }
 
-      // 2. DUSHMANLAR YOKI MOB LAR BILAN KURASH (PvP / Self-Defense)
       const enemy = bot.nearestEntity(entity => {
         return (entity.type === 'mob' && entity.username !== this.name) || 
                (entity.type === 'player' && entity.username !== this.name && this.personality.aggression > 70);
       });
 
       if (enemy && bot.entity.position.distanceTo(enemy.position) < 8) {
-        console.ch && console.log(`[COMBAT] Dushman topildi, jang boshlandi!`);
         if (this.combat && typeof this.combat.attack === 'function') {
           this.combat.attack(enemy);
           this.isBusy = false;
@@ -209,12 +199,10 @@ Reply in Uzbek language in 1 short, natural sentence.`;
         }
       }
 
-      // 3. ERKIN HARAKAT VA RESURS / QURILISH (Wander, Mine, Build)
       const actions = ['wander', 'mine', 'build'];
       const chosenAction = actions[Math.floor(Math.random() * actions.length)];
 
       if (chosenAction === 'wander') {
-        // Atrofni o'zi kashf qilib kezib yuradi
         const range = 10;
         const pos = bot.entity.position;
         const tx = pos.x + (Math.floor(Math.random() * (range * 2)) - range);
@@ -223,17 +211,13 @@ Reply in Uzbek language in 1 short, natural sentence.`;
         bot.pathfinder.setGoal(new goals.GoalNear(tx, pos.y, tz, 1));
 
       } else if (chosenAction === 'mine' && this.builder) {
-        // O'zi uchun resurs yig'adi
         await this.builder.mineWood();
 
       } else if (chosenAction === 'build' && this.builder) {
-        // O'zi uy yoki tuzilma qurishga urinadi
-        console.log(`[BUILD] Bot o'zi uchun boshpana qurmoqda...`);
-        // Builder moduli ichidagi qurish funksiyasi ishlaydi
+        // Build action
       }
 
     } catch (err) {
-      // Xatoliklarni yutib yuboradi, ishlashdan to'xtamaydi
     } finally {
       this.isBusy = false;
     }
@@ -241,4 +225,3 @@ Reply in Uzbek language in 1 short, natural sentence.`;
 }
 
 module.exports = AIAgent;
-                                    
