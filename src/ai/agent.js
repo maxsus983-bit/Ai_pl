@@ -83,16 +83,16 @@ class AIAgent {
         bot.autoEat.enable();
       }
 
-      // Doimiy harakat sikli (har 4 soniyada bir ishlaydi)
+      // Doimiy harakat va qaror qabul qilish sikli (har 4 soniyada tekshiradi)
       setInterval(() => this.decisionCycle(), 4000);
 
-      // O'ZI AVTOMATIK CHATGA YOZISH (Vaqti-vaqti bilan o'zi gap boshlaydi)
+      // O'ZI AVTOMATIK CHATGA YOZISH (Har 45 soniyada o'zi fikr bildiradi)
       setInterval(() => {
         this.sendAutonomousChat();
-      }, 45000); // Har 45 soniyada bir o'zi chatga gapiradi
+      }, 45000);
     });
 
-    // O'yinchilar yozgan xabarlarni eshitish va javob berish
+    // O'yinchilarning chat xabarlari va buyruqlari
     bot.on('chat', async (username, message) => {
       if (username === this.name) return;
       const msgLower = message.toLowerCase();
@@ -101,7 +101,7 @@ class AIAgent {
         await FactionManager.processSocialInteraction(this.name, username, message);
       } catch (e) {}
 
-      // 1. ERGASHISH BUYRUG'I ("menga ergash", "follow")
+      // 1. ERGASHISH BUYRUG'I
       if (msgLower.includes('ergash') || msgLower.includes('follow')) {
         const player = bot.players[username]?.entity;
         if (player) {
@@ -111,7 +111,7 @@ class AIAgent {
         }
       }
 
-      // 2. TO'XTASH BUYRUG'I ("to'xta", "stop")
+      // 2. TO'XTASH BUYRUG'I
       if (msgLower.includes('toxta') || msgLower.includes('stop') || msgLower.includes("to'xta")) {
         this.targetPlayerToFollow = null;
         bot.pathfinder.setGoal(null);
@@ -119,7 +119,7 @@ class AIAgent {
         return;
       }
 
-      // 3. BUYUM SO'RASH ("menga ber", "give me")
+      // 3. BUYUM SO'RASH
       if (msgLower.includes('ber') || msgLower.includes('give')) {
         if (this.personality.friendliness > 50 || Math.random() > 0.4) {
           bot.chat(`Mayli, buni senga beraman.`);
@@ -133,7 +133,7 @@ class AIAgent {
         return;
       }
 
-      // 4. AI ORQALI O'YINCHI BILAN SUHBAT QURISH
+      // 4. AI ORQALI O'YINCHI BILAN SUHBAT
       if (message.includes(this.name) || Math.random() < 0.3) {
         try {
           const systemPrompt = `You are ${this.name}, an autonomous AI citizen in Minecraft.
@@ -161,7 +161,6 @@ Reply in Uzbek language in 1 short, natural sentence.`;
     });
   }
 
-  // O'zi mustaqil ravishda chatga yozishi uchun funksiya
   async sendAutonomousChat() {
     if (!this.bot || !this.bot.entity) return;
     try {
@@ -181,7 +180,6 @@ Write a short, casual thought or message in Uzbek language to say out loud in ch
     setTimeout(() => this.connectBot(), delay);
   }
 
-  // MUSTAQIL HARAKAT SIKLI (Qotib qolmaydigan versiya)
   async decisionCycle() {
     if (!this.bot || !this.bot.entity) return;
     if (this.isBusy) return;
@@ -194,7 +192,10 @@ Write a short, casual thought or message in Uzbek language to say out loud in ch
       if (this.targetPlayerToFollow) {
         const targetPlayer = bot.players[this.targetPlayerToFollow]?.entity;
         if (targetPlayer) {
-          bot.pathfinder.setGoal(new goals.GoalFollow(targetPlayer, 2), true);
+          if (bot.entity.position.distanceTo(targetPlayer.position) > 3) {
+            bot.pathfinder.setGoal(new goals.GoalFollow(targetPlayer, 2), true);
+          }
+          this.isBusy = false;
           return;
         }
       }
@@ -208,27 +209,28 @@ Write a short, casual thought or message in Uzbek language to say out loud in ch
       if (enemy && bot.entity.position.distanceTo(enemy.position) < 8) {
         if (this.combat && typeof this.combat.attack === 'function') {
           this.combat.attack(enemy);
+          this.isBusy = false;
           return;
         }
       }
 
-      // 3. ERKIN KESIB YURISH (Atrofni kashf qilish)
-      const range = 15;
-      const pos = bot.entity.position;
-      const tx = pos.x + (Math.floor(Math.random() * (range * 2)) - range);
-      const tz = pos.z + (Math.floor(Math.random() * (range * 2)) - range);
-      
-      bot.pathfinder.setGoal(new goals.GoalNear(tx, pos.y, tz, 1));
+      // 3. ERKIN KEZIB YURISH (Serverni qotirmasdan va kick qilmasdan)
+      if (!bot.pathfinder.isMoving()) {
+        const range = 12;
+        const pos = bot.entity.position;
+        const tx = Math.floor(pos.x + (Math.random() * (range * 2) - range));
+        const tz = Math.floor(pos.z + (Math.random() * (range * 2) - range));
+        
+        bot.pathfinder.setGoal(new goals.GoalNear(tx, pos.y, tz, 1));
+      }
 
     } catch (err) {
-      console.error('[Decision Error]:', err.message);
     } finally {
       setTimeout(() => {
         this.isBusy = false;
-      }, 3000);
+      }, 5000);
     }
   }
 }
 
 module.exports = AIAgent;
-      
